@@ -1,5 +1,6 @@
 import json
 import random
+import sys
 import time
 from curl_cffi import requests
 import fake_useragent as useragent
@@ -103,27 +104,31 @@ class GmapDataFetcher:
         JSON ağacının derinliklerine inip 'İşletme İmzası' taşıyan listeleri bulur.
         """
         if isinstance(data, list):
-            # --- İŞLETME İMZASI KONTROLÜ ---
-            # Bir listenin işletme verisi olup olmadığını anlamak için kriterlerimiz:
-            # 1. Uzunluğu en az 15 olmalı (Detaylı veri genelde uzundur)
-            # 2. 14. elemanı (index 13 veya 14) bir kategori listesi olmalı (['Dişçi', ...])
-            # 3. 12. elemanı (index 11) bir işletme ismi (string) olmalı.
+            # Önce [14] index'ini kontrol et - asıl işletme verisi orada
+            try:
+                if len(data) > 14 and isinstance(data[14], list):
+                    inner = data[14]
+                    if len(inner) > 14:
+                        name_check = inner[11]
+                        category_check = inner[13]
+                        if isinstance(name_check, str) and isinstance(category_check, list) and len(category_check) > 0:
+                            # inner'ı ekle, data'yı değil
+                            results.append(inner)
+                            return
+            except (IndexError, TypeError):
+                pass
 
+            # Eski kontrol de kalsın (fallback)
             try:
                 if len(data) > 14:
                     name_check = data[11]
-                    # Google verisinde kategori genelde 13. indekste durur
                     category_check = data[13]
-
                     if isinstance(name_check, str) and isinstance(category_check, list) and len(category_check) > 0:
-                        # Bingo! Bu bir işletme detayına benziyor.
                         results.append(data)
-                        return  # Altına inmeye gerek yok
+                        return
             except (IndexError, TypeError):
                 pass
-            # --------------------------------
 
-            # Bu liste değilse, alt elemanlarına bak
             for item in data:
                 self._recursive_search(item, results)
 
@@ -136,23 +141,9 @@ class GmapDataFetcher:
         cid = self.safe_get(info, [10], default=None)
         if not cid: return None
 
-        # Rating listesini güvenli al
-        rating_list = self.safe_get(info, [4], default=[])
-        rating = self.safe_get(rating_list, [7], default=0)
-
-        # Yorum sayısı için "Çift Kontrol" (Double Check)
-        reviews = self.safe_get(rating_list, [8], default=0)  # Önce sayısal ara
-
-        if not reviews:
-            # Sayısal yoksa string olarak ara (Örn: "(154)")
-            reviews_str = self.safe_get(rating_list, [3], default=None)
-            if isinstance(reviews_str, str):
-                # "(154)" -> 154 temizliği
-                try:
-                    reviews = int(reviews_str.replace("(", "").replace(")", "").replace(",", ""))
-                except ValueError:
-                    reviews = 0
+        rating = self.safe_get(info, [4, 7], default=0)
         reviews_count = self.safe_get(info, [4, 8], default=0)
+
         latitude = self.safe_get(info, [9, 2], default=0.0)
         longitude = self.safe_get(info, [9, 3], default=0.0)
         phone_num = self.safe_get(info, [178, 0, 0], default=None)
