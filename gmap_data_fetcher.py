@@ -1,52 +1,25 @@
 import json
-
-import requests
+import random
+import time
+from curl_cffi import requests
 import fake_useragent as useragent
 
 from database import DatabaseManager
 from gmap_url_creator import GmapUrlCreator
+from grid_manager import GridManager
 
 
 class GmapDataFetcher:
     def __init__(self):
-        self.url = GmapUrlCreator(query="ankara dişçiler", zoom_meters=2000.00000000000).build_gmap_url(lat=39.96043, lng=32.76188,)
+        # Grid ayarları (Ankara Geneli)
+        self.url_generator = GmapUrlCreator(query="ankara dişçiler", zoom_meters=2000.0)
         self.db_conn = DatabaseManager()
-
-        self.headers = {
-            'accept': '*/*',
-            'accept-language': 'en-US,en;q=0.9',
-            'downlink': '10',
-            'priority': 'u=1, i',
-            'referer': 'https://www.google.com/',
-            'rtt': '50',
-            'sec-ch-ua': '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"macOS"',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-origin',
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-            'x-browser-channel': 'stable',
-            'x-browser-copyright': 'Copyright 2025 Google LLC. All Rights reserved.',
-            'x-browser-validation': 'AUXUCdutEJ+6gl6bYtz7E2kgIT4=',
-            'x-browser-year': '2025',
-            'x-maps-diversion-context-bin': 'CAE=',
-            # 'cookie': 'AEC=AaJma5vQ1BBRMhbxQUd_MsN7dEk4BrDQJxzhjCD1RE5hUriOUwjuwf7Fljw; __Secure-BUCKET=CPME; DV=w8UPNKp0v6MZQIF0XFQkBVhdNdjksBk; NID=527=WEkheKvZTcLQ_dhkTBPhJ9uzuRlwlRS6aOyaxJ3cY0hPsrsbE5yxXhpaSknVK4kf4l7LN0JLOZ-meQscjLZL91rNtc1EbLz6s4noO6clWxRah23EWIj9rwvEcu8UYfz0LK_xnyUhUEpo3MmA7nYytO1pmhbYZg_NkF6_fN6j3BLEx5iCm9catV6SnTfg2YheOEGNT5wbE8VzjcgINuDW5-EzEgVAbW9lJ8g-AQIDB6-eXNoW202B5UqaeCFWLg5anO8VnBy9XQ; __Secure-STRP=AD6DogvhICUZ-mOReiSqJQ5VZEsrayDLc-HGMiiDe9MFpdy0d5uJP-GZ0VNQE0gCtKsaeME09sbDXZBYdZ3BE5dcMqweeA2W8Ywm',
-        }
-        self.cookies = {
-            'AEC': 'AaJma5vQ1BBRMhbxQUd_MsN7dEk4BrDQJxzhjCD1RE5hUriOUwjuwf7Fljw',
-            '__Secure-BUCKET': 'CPME',
-            'DV': 'w8UPNKp0v6MZQIF0XFQkBVhdNdjksBk',
-            'NID': '527=WEkheKvZTcLQ_dhkTBPhJ9uzuRlwlRS6aOyaxJ3cY0hPsrsbE5yxXhpaSknVK4kf4l7LN0JLOZ-meQscjLZL91rNtc1EbLz6s4noO6clWxRah23EWIj9rwvEcu8UYfz0LK_xnyUhUEpo3MmA7nYytO1pmhbYZg_NkF6_fN6j3BLEx5iCm9catV6SnTfg2YheOEGNT5wbE8VzjcgINuDW5-EzEgVAbW9lJ8g-AQIDB6-eXNoW202B5UqaeCFWLg5anO8VnBy9XQ',
-            '__Secure-STRP': 'AD6DogvhICUZ-mOReiSqJQ5VZEsrayDLc-HGMiiDe9MFpdy0d5uJP-GZ0VNQE0gCtKsaeME09sbDXZBYdZ3BE5dcMqweeA2W8Ywm',
-        }
+        # Step 0.02 yaklaşık 2-3km eder, detaylı arama için idealdir.
+        self.grid_manager = GridManager(start_lat=39.80, start_lng=32.70, end_lat=39.99, end_lng=33.00, step=0.02)
+        self.ua = useragent.UserAgent()
 
     @staticmethod
     def safe_get(lst, indices, default=None):
-        """
-        İç içe listelerden güvenli veri çeker.
-        Örn: safe_get(data, [1, 7, 0], "Yok")
-        """
         try:
             current = lst
             for i in indices:
@@ -55,73 +28,143 @@ class GmapDataFetcher:
         except (IndexError, TypeError, AttributeError):
             return default
 
-    def fetch_data(self) -> list | None:
-        # Dinamik user-agent oluştur
-        ua = useragent.UserAgent()
-        self.headers['user-agent'] = ua.random
+    def run_grid_search(self):
+        """
+        Ana operasyon fonksiyonu. Grid üzerindeki her noktayı gezer.
+        """
+        print("🚀 Grid Taraması Başlıyor...")
 
-        response = requests.get(self.url, headers=self.headers, cookies=self.cookies)
-        if response.status_code == 200:
-            # Başarılı istek
+        counter = 0
+        for lat, lng in self.grid_manager.generate_coordinates():
+            counter += 1
+            print(f"\n📍 Kare #{counter}: {lat}, {lng} taranıyor...")
 
-            # 1. TEMİZLİK: Baştaki çöp karakterleri sil
-            text_data = response.text.replace(")]}'", "").strip()
-            data = json.loads(text_data)
-            return data
-        else:
-            print(f"❌ İstek hatası: {response.status_code}")
-            return None
+            url = self.url_generator.build_gmap_url(lat, lng)
 
-    def get_data(self, data: list) -> None:
-        # Keşif ve veri çıkarma işlemleri burada yapılacak
-        records = self.safe_get(data, [64], default=[])
-        if len(records) == 0:
-            print("❌ Veri bulunamadı veya yapı değişmiş olabilir.")
+            # --- CURL_CFFI İLE İSTEK ---
+            try:
+                # Impersonate ile Chrome taklidi yapıyoruz
+                response = requests.get(
+                    url,
+                    impersonate="chrome110",
+                    headers={"User-Agent": self.ua.random},
+                    timeout=15
+                )
+
+                if response.status_code == 200:
+                    # Google'ın çöp karakterlerini temizle
+                    text_data = response.text.replace(")]}'", "").strip()
+                    try:
+                        data = json.loads(text_data)
+                        # Veriyi anında işle (Return yok, döngü devam etmeli)
+                        self.process_batch(data)
+                    except json.JSONDecodeError:
+                        print("⚠️ JSON parse hatası.")
+                else:
+                    print(f"❌ Hata: {response.status_code}")
+
+                # Google'ı kızdırmamak için bekleme
+                time.sleep(random.uniform(1.5, 3.5))
+
+            except Exception as e:
+                print(f"💥 İstek hatası: {e}")
+
+    def process_batch(self, data: list) -> None:
+        """
+        Gelen JSON verisinin içindeki TÜM işletmeleri (derinlik fark etmeksizin) bulur.
+        """
+        print("   🕵️ Veri analizi yapılıyor...")
+
+        # Tüm JSON ağacını gez ve adayları topla
+        found_businesses = []
+        self._recursive_search(data, found_businesses)
+
+        if not found_businesses:
+            print("   ⚠️ Bu karede uygun formatta işletme bulunamadı.")
             return
 
-        for record in records:
-            if not isinstance(record, list):
-                continue
-            info = self.safe_get(record, [1], default=None)
-            if not info or not isinstance(info, list) or len(info) <= 11:
-                continue
-            parsed_info = self.parse_data(info)
+        count = 0
+        saved_ids = set()  # Aynı paketteki dublikeleri önlemek için
 
-            if parsed_info:
-                print("✅ Veri bulundu:")
-                self.db_conn.upsert_location(parsed_info)
+        for info in found_businesses:
+            parsed = self.parse_data(info)
+            if parsed:
+                # Aynı işletmeyi tekrar kaydetme (Paket içi deduping)
+                if parsed['id'] in saved_ids: continue
 
+                self.db_conn.upsert_location(parsed)
+                saved_ids.add(parsed['id'])
+                count += 1
+
+        print(f"   ✅ {count} benzersiz işletme veritabanına işlendi.")
+
+    def _recursive_search(self, data, results):
+        """
+        JSON ağacının derinliklerine inip 'İşletme İmzası' taşıyan listeleri bulur.
+        """
+        if isinstance(data, list):
+            # --- İŞLETME İMZASI KONTROLÜ ---
+            # Bir listenin işletme verisi olup olmadığını anlamak için kriterlerimiz:
+            # 1. Uzunluğu en az 15 olmalı (Detaylı veri genelde uzundur)
+            # 2. 14. elemanı (index 13 veya 14) bir kategori listesi olmalı (['Dişçi', ...])
+            # 3. 12. elemanı (index 11) bir işletme ismi (string) olmalı.
+
+            try:
+                if len(data) > 14:
+                    name_check = data[11]
+                    # Google verisinde kategori genelde 13. indekste durur
+                    category_check = data[13]
+
+                    if isinstance(name_check, str) and isinstance(category_check, list) and len(category_check) > 0:
+                        # Bingo! Bu bir işletme detayına benziyor.
+                        results.append(data)
+                        return  # Altına inmeye gerek yok
+            except (IndexError, TypeError):
+                pass
+            # --------------------------------
+
+            # Bu liste değilse, alt elemanlarına bak
+            for item in data:
+                self._recursive_search(item, results)
 
     def parse_data(self, info: list) -> dict | None:
+        # İsim kontrolü (Index 11)
+        name = self.safe_get(info, [11], default=None)
+        if not name or not isinstance(name, str): return None
+
+        # Google ID kontrolü (Index 10) - Bu olmadan kaydedemeyiz
+        cid = self.safe_get(info, [10], default=None)
+        if not cid: return None
+
+        # Diğer verileri güvenli çek
         rating = self.safe_get(info, [4, 7], default=0)
         reviews_count = self.safe_get(info, [4, 8], default=0)
-        latitude = self.safe_get(info, [9, 2], default=0)
-        longitude = self.safe_get(info, [9, 3], default=0)
-        name = self.safe_get(info, [11], default="Bilinmiyor")
-        phone_num = self.safe_get(info, [178, 0, 0], default="Bilinmiyor")
-        website = self.safe_get(info, [7, 0], default="Bilinmiyor")
-        address_1 = self.safe_get(info, [2, 0], default="Bilinmiyor")
-        address_2 = self.safe_get(info, [2, 1], default="Bilinmiyor")
-        address_3 = self.safe_get(info, [2, 2], default="Bilinmiyor")
-        cid = self.safe_get(info, [10], default="ID Bilinmiyor, Bozuk Veri")
+        latitude = self.safe_get(info, [9, 2], default=0.0)
+        longitude = self.safe_get(info, [9, 3], default=0.0)
+        phone_num = self.safe_get(info, [178, 0, 0], default=None)
+        website = self.safe_get(info, [7, 0], default=None)
+
+        # Adres parçalarını birleştir (Index 2 listesi)
+        address_parts = self.safe_get(info, [2], default=[])
+        address = " ".join([str(p) for p in address_parts if p]) if isinstance(address_parts, list) else ""
 
         return {
             "id": cid,
             "name": name,
-            "address": f"{address_1}, {address_2}, {address_3}",
+            "address": address,
             "phone_num": phone_num,
             "website": website,
-            "rating": int(rating),
-            "reviews_count": int(reviews_count),
-            "latitude": latitude,
-            "longitude": longitude
+            "rating": float(rating) if rating else 0.0,
+            "reviews_count": int(reviews_count) if reviews_count else 0,
+            "latitude": float(latitude) if latitude else 0.0,
+            "longitude": float(longitude) if longitude else 0.0
         }
+
 
 def main():
     gmap_fetcher = GmapDataFetcher()
-    data = gmap_fetcher.fetch_data()
-    if data:
-        gmap_fetcher.get_data(data)
+    gmap_fetcher.run_grid_search()
+
 
 if __name__ == "__main__":
     main()

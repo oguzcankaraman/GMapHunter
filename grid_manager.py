@@ -18,3 +18,13 @@ class GridManager:
                 yield lat, lng
                 lng += self.step
             lat += self.step
+
+
+def main():
+    grid_manager = GridManager(start_lat=39.8, start_lng=32.7, end_lat=39.99, end_lng=33.0, step=0.02)
+    for lat, lng in grid_manager.generate_coordinates():
+        print(f"Latitude: {lat}, Longitude: {lng}")
+
+
+if __name__ == "__main__":
+    main()
