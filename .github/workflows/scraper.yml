@@ -1,0 +1,41 @@
+name: GMap Hunter Bot 🕷️
+
+# Tetikleyiciler: Ne zaman çalışsın?
+on:
+  # 1. Manuel: GitHub sitesinden butona basınca çalışır (Test için)
+  workflow_dispatch:
+
+  # 2. Otomatik: Her 6 saatte bir çalışır (Cron formatı)
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  scrape-google-maps:
+    runs-on: ubuntu-latest
+
+    # 6 saatlik maksimum süre sınırı (GitHub kuralı)
+    timeout-minutes: 350
+
+    steps:
+      # 1. Adım: Kodları GitHub'dan çek
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 2. Adım: Python Kur (Docker kullanmadan direkt makinede çalıştıracağız, daha hızlı)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # 3. Adım: Kütüphaneleri Yükle
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Adım: Botu Çalıştır
+      - name: Run Scraper
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python gmap_data_fetcher.py
