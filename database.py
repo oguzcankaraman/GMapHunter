@@ -30,7 +30,7 @@ class DatabaseManager:
                     name         TEXT,
                     address      TEXT,
                     phone_num    TEXT,
-                    rating       INT,
+                    rating       FLOAT,
                     review_count INT,
                     website      TEXT,
                     latitude     REAL,

@@ -18,7 +18,7 @@ class GmapUrlCreator:
             f"!2m3!1f0!2f0!3f0"
             f"!3m2!1i1512!2i827"
             f"!4f13.1"
-            f"!7i20"
+            f"!7i40" # Limit value for number of results
             f"!10b1"
             # Eksik olan kritik kısımlar eklendi
             "!12m25!1m5!18b1!30b1!31m1!1b1!34e1!2m4!5m1!6e2!20e3!39b1!10b1!12b1!13b1!16b1!17m1!3e1!20m3!5e2!6b1!14b1!46m1!1b0!96b1!99b1!19m4!2m3!1i360!2i120!4i8"

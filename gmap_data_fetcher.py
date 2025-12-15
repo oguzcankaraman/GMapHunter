@@ -136,8 +136,22 @@ class GmapDataFetcher:
         cid = self.safe_get(info, [10], default=None)
         if not cid: return None
 
-        # Diğer verileri güvenli çek
-        rating = self.safe_get(info, [4, 7], default=0)
+        # Rating listesini güvenli al
+        rating_list = self.safe_get(info, [4], default=[])
+        rating = self.safe_get(rating_list, [7], default=0)
+
+        # Yorum sayısı için "Çift Kontrol" (Double Check)
+        reviews = self.safe_get(rating_list, [8], default=0)  # Önce sayısal ara
+
+        if not reviews:
+            # Sayısal yoksa string olarak ara (Örn: "(154)")
+            reviews_str = self.safe_get(rating_list, [3], default=None)
+            if isinstance(reviews_str, str):
+                # "(154)" -> 154 temizliği
+                try:
+                    reviews = int(reviews_str.replace("(", "").replace(")", "").replace(",", ""))
+                except ValueError:
+                    reviews = 0
         reviews_count = self.safe_get(info, [4, 8], default=0)
         latitude = self.safe_get(info, [9, 2], default=0.0)
         longitude = self.safe_get(info, [9, 3], default=0.0)

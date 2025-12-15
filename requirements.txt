@@ -1,5 +1,5 @@
+requests
+curl_cffi
 fake-useragent
 psycopg2-binary
 python-dotenv
-curl-cffi
-requests
