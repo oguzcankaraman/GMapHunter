@@ -35,14 +35,10 @@ def export_data():
         # --- VERİ TEMİZLİĞİ & ZENGİNLEŞTİRME ---
 
         # 1. Telefon numaralarını temizle (Sadece rakam kalsın veya formatla)
-        # df['Telefon'] = df['Telefon'].astype(str).str.replace(r'\D+', '', regex=True)
+        df['Telefon'] = df['Telefon'].astype(str).str.replace(r'\D+', '', regex=True)
 
         # 2. Web sitesi olmayanlara "Yok" yaz
         df['Web Sitesi'] = df['Web Sitesi'].fillna("Mevcut Değil")
-
-        # 3. "Kalite Skoru" diye yapay bir metrik ekleyelim (Puan * Yorum Sayısı)
-        # Bu, müşteriye "En popüler yerler bunlar" demek için iyidir.
-        df['Popülerlik Skoru'] = df['Puan'] * df['Yorum Sayısı']
 
         # --- EXCEL'E YAZMA ---
         output_file = "Ankara_Dis_Klinikleri_Listesi.xlsx"
