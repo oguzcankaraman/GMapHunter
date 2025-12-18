@@ -4,3 +4,7 @@ __pycache__
 *.pyc
 .idea
 .vscode
+assets
+README.md
+export_to_excel.py
+.env.example

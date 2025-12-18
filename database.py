@@ -24,7 +24,7 @@ class DatabaseManager:
 
     def create_table(self):
         query = """
-                CREATE TABLE IF NOT EXISTS gmap_places 
+                CREATE TABLE IF NOT EXISTS businesses
                 (
                     id           TEXT PRIMARY KEY,
                     name         TEXT,
@@ -35,6 +35,9 @@ class DatabaseManager:
                     website      TEXT,
                     latitude     REAL,
                     longitude    REAL,
+                    batch_id     TEXT,
+                    search_term  TEXT,
+                    city         TEXT,
                     last_updated TIMESTAMP
                 )
                 """
@@ -42,32 +45,34 @@ class DatabaseManager:
         self.conn.commit()
 
     def upsert_location(self, data):
-        """
-        Ürün varsa güncelle (Fiyat değişmiş olabilir), yoksa ekle.
-        """
-        # SQLite'da '?', PostgreSQL'de '%s' kullanılır.
         query = """
-                INSERT INTO gmap_places (id,
+                INSERT INTO businesses (id,
                                          name,
                                          address,
                                          phone_num,
-                                         rating, 
-                                         review_count, 
+                                         rating,
+                                         review_count,
                                          website,
+                                         batch_id,
+                                         search_term,
+                                         city,
                                          latitude,
                                          longitude,
                                          last_updated)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO UPDATE SET   name        = EXCLUDED.name,
-                                                 address        = EXCLUDED.address,
-                                                 rating       = EXCLUDED.rating,
-                                                 review_count = EXCLUDED.review_count,
-                                                 website      = EXCLUDED.website,
-                                                 latitude     = EXCLUDED.latitude,
-                                                 longitude    = EXCLUDED.longitude,
-                                                 last_updated = EXCLUDED.last_updated;
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET name         = EXCLUDED.name,
+                                               address      = EXCLUDED.address,
+                                               phone_num    = EXCLUDED.phone_num,
+                                               rating       = EXCLUDED.rating,
+                                               review_count = EXCLUDED.review_count,
+                                               website      = EXCLUDED.website,
+                                               batch_id     = EXCLUDED.batch_id,
+                                               search_term  = EXCLUDED.search_term,
+                                               city         = EXCLUDED.city,
+                                               latitude     = EXCLUDED.latitude,
+                                               longitude    = EXCLUDED.longitude,
+                                               last_updated = EXCLUDED.last_updated;
                 """
-
 
         try:
             self.cursor.execute(query, (
@@ -78,6 +83,9 @@ class DatabaseManager:
                 data['rating'],
                 data['reviews_count'],
                 data['website'],
+                data['batch_id'],
+                data['search_term'],
+                data['city'],
                 data['latitude'],
                 data['longitude'],
                 datetime.now()
@@ -86,7 +94,7 @@ class DatabaseManager:
             print(f"✅ DB UPDATE BAŞARILI: {data['name'][:20]}...")
         except Exception as e:
             print(f"Veri yazma hatası: {e}")
-            self.conn.rollback()  # Hata olursa işlemi geri al
+            self.conn.rollback()
 
     def close(self):
         if self.cursor: self.cursor.close()

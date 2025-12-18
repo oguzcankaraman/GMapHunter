@@ -19,4 +19,4 @@ COPY . .
 
 # 6. Komut: Konteyner başladığında ne yapsın?
 # Python çıktısını anlık görebilmek için -u (unbuffered) parametresini kullanıyoruz.
-CMD ["python", "-u", "gmap_data_fetcher.py"]
+CMD ["python", "-u", "main.py"]
