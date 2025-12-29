@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
   # 2. Otomatik: Her 6 saatte bir çalışır (Cron formatı)
-  schedule:
-    - cron: '0 */6 * * *'
+  #schedule:
+   # - cron: '0 */6 * * *'
 
 jobs:
   scrape-google-maps:
