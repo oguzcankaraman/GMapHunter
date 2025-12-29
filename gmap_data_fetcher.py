@@ -1,8 +1,10 @@
 import json
+import os
 import random
 import time
 from curl_cffi import requests
 import fake_useragent as useragent
+from dotenv import load_dotenv
 
 from database import DatabaseManager
 from gmap_url_creator import GmapUrlCreator
@@ -10,12 +12,12 @@ from grid_manager import GridManager
 
 
 class GmapDataFetcher:
-    def __init__(self, lat, lng, keyword, batch_id, city, zoom=13, step=0.02):
+    def __init__(self, lat, lng, keyword, batch_id, city, zoom=13, step=0.04):
         self.search_term = keyword
         self.batch_id = batch_id
         self.city = city
 
-        self.url_generator = GmapUrlCreator(query=keyword, zoom_meters=2000.0)
+        self.url_generator = GmapUrlCreator(query=keyword, zoom_meters=4500.0)
         self.db_conn = DatabaseManager()
 
         area_size = 0.05
@@ -27,6 +29,7 @@ class GmapDataFetcher:
             step=step
         )
         self.ua = useragent.UserAgent()
+        load_dotenv()
 
     @staticmethod
     def safe_get(lst, indices, default=None):
@@ -47,13 +50,21 @@ class GmapDataFetcher:
             print(f"\n📍 Kare #{counter}: {lat:.4f}, {lng:.4f} taranıyor...")
 
             url = self.url_generator.build_gmap_url(lat, lng)
+            username = os.environ.get('PROXY_USERNAME')
+            password = os.environ.get('PROXY_PASSWORD')
+            proxy = f"http://{username}:{password}@tr.decodo.com:40000"
+
 
             try:
                 response = requests.get(
                     url,
                     impersonate="chrome110",
                     headers={"User-Agent": self.ua.random},
-                    timeout=15
+                    timeout=15,
+                    proxies={
+                        'http': proxy,
+                        'https': proxy
+                    }
                 )
 
                 if response.status_code == 200:

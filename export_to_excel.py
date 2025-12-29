@@ -17,28 +17,21 @@ def export_data():
     args = get_args()
     batch_id = args.batch
 
-    print(f"📥 '{batch_id}' siparişi için veriler çekiliyor...")
+    print(f"📥 '{batch_id}' siparişi için veriler hazırlanıyor...")
 
     try:
         conn = psycopg2.connect(os.getenv("DATABASE_URL"))
 
-        # SQL Sorgusu: Sadece batch_id ile eşleşenleri alıyoruz
-        # Tablo ismini 'businesses' olarak düzelttik
+        # Sadece gerekli sütunları çekiyoruz
         query = """
-                SELECT name         as "İşletme Adı",
-                       phone_num    as "Telefon",
-                       website      as "Web Sitesi",
-                       rating       as "Puan",
-                       review_count as "Yorum Sayısı",
-                       address      as "Adres",
-                       search_term  as "Aranan Sektör",
-                       city         as "Şehir"
+                SELECT name      as "İşletme Adı",
+                       phone_num as "Telefon",
+                       address   as "Açık Adres"
                 FROM businesses
                 WHERE batch_id = %s
-                ORDER BY rating DESC
+                ORDER BY name ASC
                 """
 
-        # params=(batch_id,) ile SQL injection'ı önlüyoruz
         df = pd.read_sql_query(query, conn, params=(batch_id,))
         conn.close()
 
@@ -46,24 +39,54 @@ def export_data():
             print("❌ Bu sipariş numarasına ait veri bulunamadı!")
             return
 
-        # --- VERİ TEMİZLİĞİ ---
+        # --- VERİ TEMİZLİĞİ VE FİLTRELEME ---
+
+        # 1. Temizlik: Sadece rakamları bırak
         df['Telefon'] = df['Telefon'].astype(str).str.replace(r'\D+', '', regex=True)
-        df['Web Sitesi'] = df['Web Sitesi'].fillna("Mevcut Değil")
+
+        # 2. Filtre: Boş veya tanımsız olanları sil
+        df = df[df['Telefon'] != '']
+        df = df[df['Telefon'].notna()]
+
+        # 3. Filtre: Sadece '0' ile başlayanları al (Böylece direkt 444 ile başlayanlar elenir)
+        df = df[df['Telefon'].str.startswith('0')]
+
+        # 4. Filtre: Tam olarak 11 hane olanları al (05XX... formatı)
+        df = df[df['Telefon'].str.len() == 11]
+
+        # 5. Filtre: '0850' ile başlayan Kurumsal/Sanal numaraları sil
+        df = df[~df['Telefon'].str.startswith('0850')]
+
+        # 6. Filtre: '444' ile başlayanları sil (Normalde 11 hane kuralı bunu eler ama
+        # eğer 0444 gibi hatalı bir kayıt varsa garantiye almak için ekliyoruz)
+        df = df[~df['Telefon'].str.startswith('444')]
+
+        # Eğer filtreleme sonrası elimizde hiç veri kalmadıysa uyar
+        if df.empty:
+            print("⚠️ Uyarı: Kriterlere (0850 hariç, 11 hane vb.) uyan telefon numarası kalmadı.")
+            return
+
+        # Adres boşsa belirtelim
+        df['Açık Adres'] = df['Açık Adres'].fillna("Adres Belirtilmemiş")
 
         # --- EXCEL ÇIKTISI ---
-        # Dosya adına batch_id ekliyoruz ki karışmasın
-        output_file = f"Musteri_Listesi_{batch_id}.xlsx"
+        # Dosyayı /app klasörüne (yani sunucuda o anki dizine) kaydeder
+        output_file = f"/app/Musteri_Listesi_{batch_id}.xlsx"
 
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Data')
 
+            # Sütun genişliklerini ayarla
             worksheet = writer.sheets['Data']
             for column_cells in worksheet.columns:
-                length = max(len(str(cell.value)) for cell in column_cells)
-                worksheet.column_dimensions[column_cells[0].column_letter].width = length + 2
+                try:
+                    length = max(len(str(cell.value)) for cell in column_cells)
+                    worksheet.column_dimensions[column_cells[0].column_letter].width = length + 2
+                except:
+                    pass
 
         print(f"✅ Başarılı! Dosya hazır: {output_file}")
-        print(f"📊 Toplam {len(df)} kayıt indirildi.")
+        print(f"📊 Filtreler sonrası {len(df)} adet 'Gold Data' indirildi.")
 
     except Exception as e:
         print(f"❌ Hata oluştu: {e}")
